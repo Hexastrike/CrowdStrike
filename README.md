@@ -8,4 +8,4 @@ For testing I started with a Next-gen SIEM dashboard for RTR activities. Downloa
 
 ### Real Time Response Activities
 
-![Real Time Response Activities Dashboard](assets\real_time_response_activities_dashboard.png)
+![Real Time Response Activities Dashboard](assets/real_time_response_activities_dashboard.png)
