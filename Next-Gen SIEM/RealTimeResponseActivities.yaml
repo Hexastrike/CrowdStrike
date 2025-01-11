@@ -1,0 +1,76 @@
+name: Real Time Response Activities
+timeSelector: {}
+sharedTimeInterval:
+  enabled: true
+  isLive: false
+  start: 7d
+widgets:
+  7cb2b6b8-98a3-424b-bf85-3e84ae7e0f6b:
+    x: 0
+    y: 5
+    height: 5
+    queryString: |-
+      #event_simpleName=Event_RemoteResponseSessionEndEvent
+      | #repo.cid = ?customer-id
+      | UserName != "workflow@crowdstrike.com"
+      | rename([[HostnameField, Hostname], [UserName, Username], [SessionId, SessionID], [#repo.cid, CID], [AgentIdString, AID]])
+      // Split commands array and check if any commands exist
+      | split(Commands) | Commands = *
+      // Format commands, scripts and command line arguments
+      | case {
+          Commands = /runscript/ | Commands = /runscript -Raw=```(?<Script>[\S\s]*?)```( -CommandLine=```(?<Arguments>[\S\s]*?)```)?/ | Commands := "";
+          Commands := Commands
+      }
+      // Output
+      | select([Hostname, Username, Commands, Script, Arguments, AID, SessionID, CID])
+    end: now
+    start: 7d
+    width: 12
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Real Time Response Commands
+    isLive: false
+    type: query
+  b1525833-3e63-4f89-8803-b8baac6a9df3:
+    x: 0
+    y: 0
+    height: 5
+    queryString: |-
+      // Get all RTR session start events
+      #event_simpleName = Event_RemoteResponseSessionStartEvent
+      | #repo.cid = ?customer-id
+      // Filter out CrowdStrike Fusion SOAR user
+      | UserName != workflow@crowdstrike.com
+      // RTR session start renaming
+      | rename([[HostnameField, Hostname], [UserName, Username], [SessionId, SessionID], [#repo.cid, CID], [AgentIdString, AID]])
+      // Join RTR session end event on SessionId
+      | join(query={#event_simpleName=Event_RemoteResponseSessionEndEvent | UserName != workflow@crowdstrike.com}, field=SessionID, key=SessionId, mode=left, include=[EndTimestamp])
+      // Time formatting
+      | Minutes := (EndTimestamp - StartTimestamp) / 60
+      | round(Minutes)
+      | formatTime(format="%d.%m.%Y %H:%M:%S", as=StartTimestamp, field=StartTimestamp, locale=de_DE, timezone="Europe/Berlin")
+      | formatTime(format="%d.%m.%Y %H:%M:%S", as=EndTimestamp, field=EndTimestamp, locale=de_DE, timezone="Europe/Berlin")
+      // Output
+      | select([StartTimestamp, EndTimestamp, Minutes, Hostname, Username, AID, SessionID, CID])
+    end: now
+    start: 7d
+    width: 12
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Real Time Response Sessions
+    isLive: false
+    type: query
+$schema: https://schemas.humio.com/dashboard/v0.17.0
+parameters:
+  customer-id:
+    label: Customer ID
+    order: 50
+    type: text
+    defaultValue: '*'
+    width: 1
